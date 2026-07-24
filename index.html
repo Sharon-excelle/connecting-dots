@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connecting Dots — an EXCELLE tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+--ink:#0e0e0e;--ink2:#3a3a3a;--ink3:#7a7a7a;--ink4:#b0b0b0;
+--paper:#faf8f4;--paper2:#f2efe8;--paper3:#e8e4da;
+--accent:#8B1A1A;--accent2:#b52a2a;--accent3:#f0e4e4;
+--gold:#c9902a;--gold2:#f5e6c8;
+--green:#1a5c3a;--green2:#e4f0ea;
+--blue:#1a3a6e;--blue2:#e4eaf5;
+--dot-size:13px;
+}
+body{font-family:'Instrument Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden}
+.serif{font-family:'DM Serif Display',serif}
+.screen{display:none;min-height:100vh;flex-direction:column}
+.screen.active{display:flex}
+
+.home-inner{max-width:660px;margin:0 auto;padding:2.5rem 1.75rem 2rem;display:flex;flex-direction:column;gap:1.75rem}
+.home-label{font-size:10px;letter-spacing:.15em;color:var(--ink3);text-transform:uppercase;font-weight:500}
+.home-title{font-size:2.8rem;line-height:1.05}
+.home-title em{color:var(--accent);font-style:italic}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mode-card{background:var(--paper2);border:1px solid var(--paper3);border-radius:10px;padding:1rem 1rem .85rem;cursor:pointer;transition:all .18s;text-align:left;display:flex;flex-direction:column;gap:.35rem}
+.mode-card:hover{background:#fff;border-color:var(--accent);transform:translateY(-2px)}
+.mode-card.primary{background:var(--accent);border-color:var(--accent)}
+.mode-card.primary:hover{background:var(--accent2)}
+.mode-tag{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);font-weight:500}
+.mode-card.primary .mode-tag{color:rgba(255,255,255,.6)}
+.mode-name{font-size:.97rem;font-weight:600;color:var(--ink)}
+.mode-card.primary .mode-name{color:#fff}
+.mode-desc{font-size:.76rem;color:var(--ink2);line-height:1.5}
+.mode-card.primary .mode-desc{color:rgba(255,255,255,.65)}
+.manual-teaser{background:var(--ink);border-radius:10px;padding:1.1rem 1.3rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;transition:opacity .15s}
+.manual-teaser:hover{opacity:.88}
+.mt-label{font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+.mt-title{font-size:.95rem;font-weight:600;color:#fff;margin:.15rem 0 .1rem}
+.mt-sub{font-size:.75rem;color:rgba(255,255,255,.45)}
+.mt-count{font-size:1.7rem;font-family:'DM Mono',monospace;color:var(--gold)}
+.divider{height:1px;background:var(--paper3)}
+.sl{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);font-weight:600}
+
+#activation{background:var(--ink);color:#fff;justify-content:center;align-items:center;padding:1.75rem}
+.activation-inner{max-width:540px;width:100%;display:flex;flex-direction:column;gap:1.6rem}
+.act-label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+.act-title{font-size:1.9rem;line-height:1.1}
+.act-title em{color:var(--gold);font-style:italic}
+.env-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.env-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:.6rem .35rem;cursor:pointer;transition:all .15s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px}
+.env-btn:hover,.env-btn.sel{background:rgba(201,144,42,.18);border-color:var(--gold)}
+.env-icon{font-size:1.2rem}
+.env-name{font-size:.6rem;color:rgba(255,255,255,.55)}
+.act-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:.85rem 1.05rem;color:#fff;font-size:.88rem;width:100%;font-family:inherit;resize:none;height:72px;line-height:1.6}
+.act-input::placeholder{color:rgba(255,255,255,.28)}
+.act-input:focus{outline:none;border-color:var(--gold)}
+.brain-note{font-size:.76rem;color:rgba(255,255,255,.38);line-height:1.6;padding:.65rem .95rem;border-left:2px solid rgba(201,144,42,.35)}
+.btn-primary{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:.82rem 1.75rem;font-size:.9rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;width:100%}
+.btn-primary:hover{background:var(--accent2)}
+.btn-ghost-dark{background:transparent;color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:.62rem 1.3rem;font-size:.8rem;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-ghost-dark:hover{color:#fff;border-color:rgba(255,255,255,.35)}
+
+#game{flex-direction:column}
+.game-header{background:var(--ink);color:#fff;padding:.65rem 1.4rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.gh-title{font-size:.8rem;font-weight:600}
+.gh-mode{font-size:.65rem;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase}
+.progress-dots{display:flex;gap:5px;align-items:center}
+.prog-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.18);transition:all .3s}
+.prog-dot.done{background:var(--gold)}
+.prog-dot.active{background:#fff;transform:scale(1.4)}
+.timer-box{font-family:'DM Mono',monospace;font-size:.88rem;color:#fff;background:rgba(255,255,255,.07);padding:.28rem .6rem;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,.1);min-width:64px;text-align:center;transition:all .15s}
+.timer-box:hover{background:rgba(255,255,255,.13)}
+.timer-box.running{color:var(--gold);border-color:rgba(201,144,42,.35)}
+.timer-box.urgent{color:#f08080;border-color:rgba(240,128,128,.35)}
+.game-body{flex:1;padding:1.6rem;max-width:660px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:1.6rem}
+
+.room-header{display:flex;align-items:flex-start;justify-content:space-between;gap:.85rem}
+.room-level{font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.room-title{font-size:1.65rem;line-height:1.1;margin:.18rem 0 .3rem}
+.room-info-btn{background:none;border:1px solid var(--paper3);border-radius:20px;padding:.25rem .7rem;font-size:.7rem;color:var(--ink3);cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.room-info-btn:hover{border-color:var(--ink3);color:var(--ink)}
+.room-info-panel{background:var(--paper2);border-radius:8px;padding:.85rem 1rem;font-size:.82rem;color:var(--ink2);line-height:1.7;border-left:3px solid var(--accent);display:none}
+.room-info-panel.open{display:block}
+
+.q-block{display:flex;flex-direction:column;gap:.42rem}
+.q-num{font-size:.6rem;color:var(--ink4);font-family:'DM Mono',monospace}
+.q-text{font-size:.9rem;color:var(--ink);line-height:1.6}
+.q-ref{font-size:.68rem;color:var(--ink3);font-style:italic}
+.q-input{background:var(--paper2);border:1px solid var(--paper3);border-radius:8px;padding:.72rem .9rem;font-size:.87rem;color:var(--ink);font-family:inherit;resize:none;width:100%;line-height:1.6;min-height:74px;transition:border .15s}
+.q-input:focus{outline:none;border-color:var(--accent);background:#fff}
+.q-input::placeholder{color:var(--ink4)}
+.q-single{min-height:40px}
+
+.dot-map{display:flex;flex-direction:column;padding:.35rem 0}
+.dot-row{display:grid;grid-template-columns:auto 1fr auto;gap:.75rem;align-items:start;position:relative}
+.dot-row:not(:last-child)::before{content:'';position:absolute;left:5px;top:20px;width:2px;bottom:-12px;background:var(--paper3)}
+.dot-circle{width:var(--dot-size);height:var(--dot-size);border-radius:50%;border:2px solid var(--paper3);background:var(--paper);flex-shrink:0;margin-top:3px;transition:all .2s;position:relative;z-index:1}
+.dot-circle.R{background:var(--green);border-color:var(--green)}
+.dot-circle.W{background:var(--accent);border-color:var(--accent)}
+.dot-circle.U{background:var(--gold);border-color:var(--gold)}
+.dot-circle.M{background:var(--blue);border-color:var(--blue)}
+.dot-content{display:flex;flex-direction:column;gap:3px;padding-bottom:1.1rem}
+.dot-event{font-size:.82rem;color:var(--ink);width:100%;background:var(--paper2);border:1px solid var(--paper3);border-radius:6px;padding:.42rem .65rem;font-family:inherit;resize:none;min-height:38px;line-height:1.5;transition:border .15s}
+.dot-event:focus{outline:none;border-color:var(--accent);background:#fff}
+.dot-label{display:flex;gap:3px;margin-top:2px}
+.label-btn{font-size:.6rem;padding:.16rem .42rem;border-radius:4px;border:1px solid var(--paper3);background:var(--paper);cursor:pointer;font-weight:500;color:var(--ink3);transition:all .15s;font-family:inherit}
+.label-btn.R.sel{background:var(--green2);color:var(--green);border-color:var(--green)}
+.label-btn.W.sel{background:var(--accent3);color:var(--accent);border-color:var(--accent)}
+.label-btn.U.sel{background:var(--gold2);color:var(--gold);border-color:var(--gold)}
+.label-btn.M.sel{background:var(--blue2);color:var(--blue);border-color:var(--blue)}
+.add-dot-btn{display:flex;align-items:center;gap:.45rem;background:none;border:1px dashed var(--paper3);border-radius:8px;padding:.55rem .85rem;cursor:pointer;font-size:.8rem;color:var(--ink3);font-family:inherit;transition:all .15s;width:100%;margin-top:.35rem}
+.add-dot-btn:hover{border-color:var(--ink3);color:var(--ink)}
+.dot-del{background:none;border:none;color:var(--ink4);cursor:pointer;font-size:.82rem;padding:.18rem;margin-top:2px;transition:color .15s}
+.dot-del:hover{color:var(--accent)}
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;padding:.6rem .85rem;background:var(--paper2);border-radius:8px}
+.legend-item{display:flex;align-items:center;gap:.32rem;font-size:.7rem;color:var(--ink2)}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+.legend-dot.R{background:var(--green)}.legend-dot.W{background:var(--accent)}.legend-dot.U{background:var(--gold)}.legend-dot.M{background:var(--blue)}
+
+.wt-grid{display:flex;gap:6px;flex-wrap:wrap}
+.wt-btn{display:flex;align-items:center;gap:.32rem;background:var(--paper2);border:1px solid var(--paper3);border-radius:20px;padding:.32rem .8rem;font-size:.76rem;cursor:pointer;font-family:inherit;color:var(--ink2);transition:all .15s}
+.wt-btn:hover{border-color:var(--ink3);color:var(--ink)}
+.wt-btn.sel{background:var(--accent3);border-color:var(--accent);color:var(--accent)}
+.wt-dot{width:6px;height:6px;border-radius:50%}
+
+.munger-box{background:var(--paper2);border-radius:10px;border-left:3px solid var(--gold);padding:.85rem 1.05rem;display:flex;flex-direction:column;gap:.6rem}
+.munger-title{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:600}
+.munger-q{font-size:.8rem;color:var(--ink2);line-height:1.6}
+.munger-input{background:#fff;border:1px solid var(--paper3);border-radius:6px;padding:.52rem .72rem;font-size:.8rem;font-family:inherit;color:var(--ink);width:100%;resize:none;min-height:46px;line-height:1.5;transition:border .15s}
+.munger-input:focus{outline:none;border-color:var(--gold)}
+
+.rule-list{display:flex;flex-direction:column;gap:.4rem}
+.rule-item{display:flex;gap:.6rem;align-items:start;background:var(--paper2);border-radius:8px;padding:.6rem .85rem}
+.rule-num{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--ink4);flex-shrink:0;margin-top:2px}
+.rule-text{font-size:.82rem;color:var(--ink);line-height:1.5;flex:1;background:none;border:none;font-family:inherit;resize:none;min-height:32px;padding:0}
+.rule-text:focus{outline:none}
+.add-rule-btn{display:flex;align-items:center;gap:.45rem;background:none;border:1px dashed var(--paper3);border-radius:8px;padding:.52rem .85rem;cursor:pointer;font-size:.76rem;color:var(--ink3);font-family:inherit;transition:all .15s;width:100%}
+.add-rule-btn:hover{border-color:var(--ink3);color:var(--ink)}
+
+.sprint-banner{background:var(--accent3);border-radius:8px;padding:.65rem .9rem;display:flex;align-items:center;gap:.6rem;border:1px solid rgba(139,26,26,.13)}
+.sprint-banner.gold{background:var(--gold2);border-color:rgba(201,144,42,.18)}
+.sprint-icon{font-size:.95rem}
+.sprint-text{font-size:.78rem;color:var(--ink2);line-height:1.5}
+.sprint-text strong{color:var(--ink)}
+
+.ai-placeholder{background:var(--paper2);border:1px dashed var(--paper3);border-radius:10px;padding:.9rem 1.1rem;display:flex;align-items:center;gap:.7rem}
+.ai-ph-icon{font-size:1rem;opacity:.5}
+.ai-ph-text{display:flex;flex-direction:column;gap:.12rem}
+.ai-ph-title{font-size:.82rem;font-weight:600;color:var(--ink3)}
+.ai-ph-sub{font-size:.72rem;color:var(--ink4)}
+
+.nav-row{display:flex;gap:.6rem;align-items:center;padding:1.1rem 0}
+.btn-next{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:.78rem 1.6rem;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-next:hover{background:var(--accent2)}
+.btn-next:disabled{opacity:.6;cursor:wait}
+.btn-back{background:none;border:1px solid var(--paper3);border-radius:8px;padding:.78rem 1.05rem;font-size:.85rem;cursor:pointer;font-family:inherit;color:var(--ink2);transition:all .15s}
+.btn-back:hover{border-color:var(--ink3);color:var(--ink)}
+.nav-hint{font-size:.7rem;color:var(--ink4);margin-left:auto}
+
+#boss{background:var(--ink);color:#fff;flex-direction:column}
+.boss-inner{max-width:660px;margin:0 auto;padding:2.5rem 1.75rem;display:flex;flex-direction:column;gap:1.6rem;width:100%}
+.boss-label{font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+.boss-title{font-size:2rem;line-height:1.1}
+.boss-title em{color:var(--gold);font-style:italic}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.sum-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:.9rem 1.05rem;display:flex;flex-direction:column;gap:.35rem}
+.sum-card-label{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+.sum-card-val{font-size:.85rem;color:#fff;line-height:1.6;font-style:italic}
+.impact-list{background:rgba(201,144,42,.1);border:1px solid rgba(201,144,42,.22);border-radius:10px;padding:1.05rem 1.2rem;display:flex;flex-direction:column;gap:.6rem}
+.impact-label{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+.impact-item{display:flex;align-items:start;gap:.55rem;font-size:.82rem;color:rgba(255,255,255,.82);line-height:1.5}
+.impact-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:.38rem}
+.saved-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(26,92,58,.25);border:1px solid rgba(26,92,58,.4);border-radius:20px;padding:.28rem .7rem;font-size:.7rem;color:#6ecf9a;align-self:flex-start}
+.saved-badge.fail{background:rgba(139,26,26,.25);border-color:rgba(181,42,42,.5);color:#f0a0a0}
+.boss-actions{display:flex;gap:.6rem;flex-wrap:wrap}
+.btn-pdf{background:var(--gold);color:var(--ink);border:none;border-radius:8px;padding:.78rem 1.6rem;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-pdf:hover{opacity:.9}
+.btn-view-manual{background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:.78rem 1.3rem;font-size:.85rem;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-view-manual:hover{background:rgba(255,255,255,.13)}
+.btn-new{background:transparent;color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:.78rem 1.1rem;font-size:.82rem;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-new:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+
+#manual{background:var(--paper);flex-direction:column}
+.manual-header{background:var(--ink);padding:1.1rem 1.75rem;display:flex;align-items:center;justify-content:space-between}
+.manual-header-title{color:#fff;font-size:.87rem;font-weight:600}
+.manual-body{max-width:660px;margin:0 auto;padding:1.75rem;width:100%;display:flex;flex-direction:column;gap:1.75rem}
+.manual-section-title{font-size:.65rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);font-weight:600;padding-bottom:.38rem;border-bottom:1px solid var(--paper3);margin-bottom:.75rem}
+.session-card{background:var(--paper2);border:1px solid var(--paper3);border-radius:10px;padding:.95rem 1.1rem;display:flex;flex-direction:column;gap:.55rem;margin-bottom:.5rem}
+.sc-header{display:flex;align-items:start;justify-content:space-between;gap:.85rem}
+.sc-date{font-size:.68rem;color:var(--ink4);font-family:'DM Mono',monospace}
+.sc-mode{font-size:.62rem;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);background:var(--accent3);padding:.18rem .5rem;border-radius:12px}
+.sc-project{font-size:.87rem;font-weight:600;color:var(--ink);margin-top:.15rem}
+.sc-rules{display:flex;flex-direction:column;gap:.28rem;margin-top:.2rem}
+.sc-rule{font-size:.78rem;color:var(--ink2);padding:.28rem .48rem;background:#fff;border-radius:5px;border:1px solid var(--paper3)}
+.sc-del{background:none;border:none;color:var(--ink4);cursor:pointer;font-size:.75rem;padding:.18rem .38rem;border-radius:4px;transition:all .15s;flex-shrink:0}
+.sc-del:hover{color:var(--accent);background:var(--accent3)}
+.all-rule-row{display:flex;align-items:start;gap:.7rem;padding:.65rem .85rem;background:var(--paper2);border-radius:8px;border:1px solid var(--paper3);margin-bottom:.4rem}
+.ar-num{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--ink4);flex-shrink:0;margin-top:2px}
+.ar-text{font-size:.83rem;color:var(--ink);line-height:1.5;flex:1}
+.ar-date{font-size:.65rem;color:var(--ink4);flex-shrink:0;margin-top:2px}
+.wt-tally{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:7px}
+.wt-card{background:var(--paper2);border:1px solid var(--paper3);border-radius:8px;padding:.7rem;display:flex;flex-direction:column;gap:.28rem}
+.wt-name{font-size:.72rem;color:var(--ink2)}
+.wt-count{font-size:1.3rem;font-family:'DM Mono',monospace;color:var(--ink)}
+.wt-bar{height:3px;background:var(--paper3);border-radius:2px;overflow:hidden}
+.wt-fill{height:100%;border-radius:2px;transition:width .6s ease}
+.empty-state{text-align:center;padding:2.5rem 1rem;color:var(--ink4);font-size:.88rem;line-height:1.8}
+.err-note{background:var(--accent3);border:1px solid rgba(139,26,26,.2);border-radius:8px;padding:.75rem .95rem;font-size:.8rem;color:var(--accent);line-height:1.6}
+
+@media(max-width:520px){
+  .home-title{font-size:2.2rem}.mode-grid{grid-template-columns:1fr}.summary-grid{grid-template-columns:1fr}.env-grid{grid-template-columns:repeat(3,1fr)}.game-body{padding:1.1rem}.manual-body{padding:1.1rem}
+}
+</style>
+</head>
+<body>
+
+<div id="home" class="screen active">
+<div class="home-inner">
+  <div>
+    <div class="home-label">An EXCELLE Tool</div>
+    <h1 class="home-title serif">Connecting<br><em>Dots.</em></h1>
+  </div>
+  <p style="font-size:.9rem;color:var(--ink2);line-height:1.7;max-width:460px">For when you're deep in the work and reality has hit the plan. Read the pattern. Rebuild from now.</p>
+  <div class="manual-teaser" onclick="showScreen('manual')">
+    <div>
+      <div class="mt-label">Personal Operating Manual</div>
+      <div class="mt-title">Your rules. Your patterns. Your evidence.</div>
+      <div class="mt-sub" id="manual-teaser-sub">Loading...</div>
+    </div>
+    <div class="mt-count" id="manual-teaser-count">—</div>
+  </div>
+  <div>
+    <div class="sl" style="margin-bottom:.65rem">Choose your mode</div>
+    <div class="mode-grid">
+      <div class="mode-card primary" onclick="startGame('full')">
+        <div class="mode-tag">Core Exercise</div>
+        <div class="mode-name">Full Session</div>
+        <div class="mode-desc">All three rooms. The complete mid-flight reality check.</div>
+      </div>
+      <div class="mode-card" onclick="startGame('stuck')">
+        <div class="mode-tag">Stuck Mode</div>
+        <div class="mode-name">I Can't Move</div>
+        <div class="mode-desc">Something is blocking you. Name it and route around it.</div>
+      </div>
+      <div class="mode-card" onclick="startGame('kickoff')">
+        <div class="mode-tag">Kickoff Mode</div>
+        <div class="mode-name">Starting Fresh</div>
+        <div class="mode-desc">Map the fears. Build the bridge before you begin.</div>
+      </div>
+      <div class="mode-card" onclick="startGame('timeline')">
+        <div class="mode-tag">Timeline Audit</div>
+        <div class="mode-name">Client Deadline</div>
+        <div class="mode-desc">Pull from your evidence. Give a timeline that holds.</div>
+      </div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <p style="font-size:.74rem;color:var(--ink4);line-height:1.7">Find your environment. Earphones in. Order your thing. You are not here to feel. You are here to see.</p>
+</div>
+</div>
+
+<div id="activation" class="screen">
+<div class="activation-inner">
+  <div>
+    <div class="act-label" id="act-mode-label">Full Session</div>
+    <h2 class="act-title serif">Activate<br><em>the Strategist.</em></h2>
+  </div>
+  <div>
+    <div style="font-size:.76rem;color:rgba(255,255,255,.45);margin-bottom:.5rem">Where are you right now?</div>
+    <div class="env-grid">
+      <div class="env-btn" onclick="selectEnv(this,'Café')"><div class="env-icon">☕</div><div class="env-name">Café</div></div>
+      <div class="env-btn" onclick="selectEnv(this,'Car')"><div class="env-icon">🚗</div><div class="env-name">Car</div></div>
+      <div class="env-btn" onclick="selectEnv(this,'Nature')"><div class="env-icon">🌿</div><div class="env-name">Nature</div></div>
+      <div class="env-btn" onclick="selectEnv(this,'Room')"><div class="env-icon">🪴</div><div class="env-name">My Room</div></div>
+      <div class="env-btn" onclick="selectEnv(this,'Work')"><div class="env-icon">🏢</div><div class="env-name">Work</div></div>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:.76rem;color:rgba(255,255,255,.45);margin-bottom:.5rem">Emotional Prediction <span style="color:rgba(255,255,255,.25);font-size:.66rem">— Barrett</span></div>
+    <textarea class="act-input" id="pred-input" placeholder="Right now, my brain predicts this session will feel like..."></textarea>
+    <div class="brain-note" style="margin-top:.65rem">Your brain predicts, it doesn't read reality. Name it. Then disprove it.</div>
+  </div>
+  <div style="display:flex;gap:.6rem">
+    <button class="btn-ghost-dark" onclick="goHome()">← Back</button>
+    <button class="btn-primary" onclick="beginGame()" style="flex:1">Enter the Map →</button>
+  </div>
+</div>
+</div>
+
+<div id="game" class="screen">
+  <div class="game-header">
+    <div style="display:flex;align-items:center;gap:1.1rem">
+      <div>
+        <div class="gh-title">Connecting Dots</div>
+        <div class="gh-mode" id="gh-mode-label">Full Session</div>
+      </div>
+      <div class="progress-dots" id="prog-dots"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.6rem">
+      <div id="timer-box" class="timer-box" onclick="toggleTimer()" title="Click to start/pause sprint">10:00</div>
+      <button class="btn-ghost-dark" onclick="goHome()" style="padding:.26rem .6rem;font-size:.7rem">Exit</button>
+    </div>
+  </div>
+  <div class="game-body" id="game-body"></div>
+</div>
+
+<div id="boss" class="screen">
+<div class="boss-inner">
+  <div style="display:flex;align-items:center;gap:.75rem">
+    <div>
+      <div class="boss-label">Session Complete</div>
+      <h2 class="boss-title serif">The Pattern<br><em>Revealed.</em></h2>
+    </div>
+    <div style="font-size:2.2rem">🏆</div>
+  </div>
+  <div class="saved-badge" id="save-badge">Saving...</div>
+  <div class="summary-grid" id="boss-summary"></div>
+  <div class="impact-list" id="boss-impact"></div>
+  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.95rem 1.1rem">
+    <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:.38rem">Your Prediction vs Reality</div>
+    <div id="boss-prediction" style="font-size:.85rem;color:rgba(255,255,255,.62);line-height:1.6;font-style:italic"></div>
+  </div>
+  <div class="boss-actions">
+    <button class="btn-pdf" onclick="exportPDF()">Download Full Plan PDF</button>
+    <button class="btn-view-manual" onclick="showScreen('manual')">View Manual</button>
+    <button class="btn-new" onclick="goHome()">New Session</button>
+  </div>
+</div>
+</div>
+
+<div id="manual" class="screen">
+  <div class="manual-header">
+    <div class="manual-header-title">Personal Operating Manual</div>
+    <button class="btn-ghost-dark" onclick="goHome()" style="padding:.26rem .6rem;font-size:.7rem">← Home</button>
+  </div>
+  <div class="manual-body" id="manual-body"><div class="empty-state">Loading...</div></div>
+</div>
+
+<script>
+/* ============================================================
+   SUPABASE CONNECTION
+   ============================================================ */
+const SUPABASE_URL = 'https://yovomzchhggkpnnlcqzf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvdm9temNoaGdna3BubmxjcXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NjkwNTMsImV4cCI6MjA5NTU0NTA1M30.FGhT4Tk9ubwA5tfPCNf4Smq5qIYzBPsSuDsmUkaQQy8';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* Anonymous device identity — each browser gets its own private Manual */
+function getDeviceId(){
+  let id = localStorage.getItem('cd_device_id');
+  if(!id){
+    id = 'dev_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('cd_device_id', id);
+  }
+  return id;
+}
+const DEVICE_ID = getDeviceId();
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let currentMode='full',currentRoom=0,timerInterval=null,timerSeconds=600,timerRunning=false;
+let selectedEnv='',dots=[],rules=[],answers={},selectedWorkTypes=[];
+let currentSession=null;
+
+const MODES={
+  full:{label:'Full Session',rooms:['map','bridge','mirror']},
+  stuck:{label:'Stuck Mode',rooms:['map','bridge','mirror']},
+  kickoff:{label:'Kickoff Mode',rooms:['fears','bridge','mirror']},
+  timeline:{label:'Timeline Audit',rooms:['bridge']}
+};
+const WORK_TYPES=[
+  {id:'creative',label:'Creative Work',color:'#1a3a6e'},
+  {id:'deep',label:'Deep / Strategy',color:'#1a5c3a'},
+  {id:'planning',label:'Planning Work',color:'#c9902a'},
+  {id:'execution',label:'Execution Work',color:'#8B1A1A'},
+  {id:'relational',label:'Relational Work',color:'#5a1a6e'}
+];
+const ROOM_INFO={
+  map:`You are a detective, not a defendant. This room is about seeing exactly where you are and how you got here — without judgment. Write fast. Don't edit. The goal is honesty, not polish. Every dot you place is a data point, not a verdict.`,
+  fears:`Before you build anything, clear the ground. Name every fear and assumption sitting in your body right now. Then we separate fact from prediction — because your brain is a prediction machine, not a reality reader.`,
+  bridge:`You are not rebuilding from the original plan. You are building from now — from the actual ground you are standing on. This room is about the most realistic path forward, step by step, with real timelines.`,
+  mirror:`This is the room that compounds over time. Everything you write here goes into your Personal Operating Manual — the document that makes you faster and more self-aware on every future project.`
+};
+
+/* ============================================================
+   SUPABASE HELPERS
+   ============================================================ */
+async function loadSessions(){
+  const {data,error} = await db.from('sessions')
+    .select('*')
+    .eq('device_id', DEVICE_ID)
+    .order('created_at',{ascending:false});
+  if(error){console.error('Load error:',error); return {rows:[],error};}
+  return {rows:data||[],error:null};
+}
+
+async function saveSession(session){
+  const {data,error} = await db.from('sessions').insert([{
+    device_id: DEVICE_ID,
+    mode: session.mode,
+    project: session.project,
+    env: session.env,
+    prediction: session.prediction,
+    answers: session.answers,
+    dots: session.dots,
+    rules: session.rules,
+    work_types: session.workTypes,
+    real_timeline: session.realTimeline
+  }]).select();
+  if(error){console.error('Save error:',error); return {ok:false,error};}
+  return {ok:true,row:(data&&data[0])||null};
+}
+
+async function deleteSession(id){
+  const {error} = await db.from('sessions').delete().eq('id',id).eq('device_id',DEVICE_ID);
+  if(error) console.error(error);
+  renderManual(); updateHomeTeaser();
+}
+
+async function clearAllSessions(){
+  if(!confirm('Clear all sessions? This cannot be undone.')) return;
+  const {error} = await db.from('sessions').delete().eq('device_id',DEVICE_ID);
+  if(error) console.error(error);
+  renderManual(); updateHomeTeaser();
+}
+
+async function updateHomeTeaser(){
+  const {rows,error} = await loadSessions();
+  const countEl=document.getElementById('manual-teaser-count');
+  const subEl=document.getElementById('manual-teaser-sub');
+  if(error){countEl.textContent='—';subEl.textContent='Connection issue — check back shortly';return;}
+  const allRules=rows.flatMap(s=>s.rules||[]).filter(r=>(r||'').trim());
+  countEl.textContent=rows.length||'0';
+  subEl.textContent = rows.length===0 ? 'No sessions yet — start your first'
+    : `${rows.length} session${rows.length!==1?'s':''} · ${allRules.length} rule${allRules.length!==1?'s':''} logged`;
+}
+
+/* ============================================================
+   GAME FLOW
+   ============================================================ */
+function startGame(mode){
+  currentMode=mode;selectedEnv='';dots=[{event:'',label:'',date:''}];rules=[''];answers={};selectedWorkTypes=[];currentSession=null;
+  document.getElementById('act-mode-label').textContent=MODES[mode].label;
+  document.getElementById('gh-mode-label').textContent=MODES[mode].label;
+  document.getElementById('pred-input').value='';
+  showScreen('activation');
+}
+function selectEnv(el,name){document.querySelectorAll('.env-btn').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');selectedEnv=name;}
+function beginGame(){
+  currentRoom=0;resetTimer();
+  buildProgressDots();renderRoom();showScreen('game');
+}
+function buildProgressDots(){
+  document.getElementById('prog-dots').innerHTML=MODES[currentMode].rooms.map((_,i)=>`<div class="prog-dot ${i===0?'active':''}" id="pd-${i}"></div>`).join('');
+}
+function updateProgressDots(){
+  MODES[currentMode].rooms.forEach((_,i)=>{
+    const el=document.getElementById('pd-'+i);if(!el)return;
+    el.className='prog-dot'+(i<currentRoom?' done':i===currentRoom?' active':'');
+  });
+}
+function renderRoom(){
+  const room=MODES[currentMode].rooms[currentRoom];
+  const body=document.getElementById('game-body');
+  updateProgressDots();resetTimer();
+  const builders={map:buildMapRoom,fears:buildFearsRoom,bridge:buildBridgeRoom,mirror:buildMirrorRoom};
+  body.innerHTML=builders[room]();
+  window.scrollTo(0,0);
+}
+function roomCount(){return MODES[currentMode].rooms.length;}
+function roomInfoBtn(){return `<button class="room-info-btn" onclick="toggleRoomInfo(this)">What is this room?</button>`;}
+function toggleRoomInfo(btn){btn.closest('.room-header').nextElementSibling.classList.toggle('open');}
+function aiPlaceholder(){return `<div class="ai-placeholder"><div class="ai-ph-icon">🧠</div><div class="ai-ph-text"><div class="ai-ph-title">AI Analysis — coming soon</div><div class="ai-ph-sub">Pattern reading, wins and suggestions arrive in the next version</div></div></div>`;}
+
+function buildMapRoom(){return `
+<div class="room-header">
+  <div><div class="room-level">Level 01 — The Map</div><h2 class="room-title serif">Where are you,<br>and how did you get here?</h2></div>
+  ${roomInfoBtn()}
+</div>
+<div class="room-info-panel">${ROOM_INFO.map}</div>
+<div class="sprint-banner"><div class="sprint-icon">⏱</div><div class="sprint-text"><strong>5–10 min sprint.</strong> Click the timer. Write fast. Don't edit. Analysis comes after.</div></div>
+<div class="q-block">
+  <div class="q-num">01.1</div>
+  <div class="q-text">In one sentence — what is this project, goal, or work initiative?</div>
+  <textarea class="q-input q-single" placeholder="e.g. Launch the EXCELLE workshop by Q3 — strategy approved, now in execution" oninput="saveAnswer('project_one_line',this.value)">${esc(answers.project_one_line)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">01.2</div>
+  <div class="q-text">What was the approved plan or strategy? What did the path look like on paper?</div>
+  <textarea class="q-input" placeholder="Describe it briefly — the plan as it was approved or set..." oninput="saveAnswer('original_vision',this.value)">${esc(answers.original_vision)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">01.3</div>
+  <div class="q-text">Map your dots — every move, decision, stall, pivot, win, loss, hit, surprise. Top to bottom. Label each one.</div>
+  <div class="legend"><div class="legend-item"><div class="legend-dot R"></div>Right</div><div class="legend-item"><div class="legend-dot W"></div>Wrong</div><div class="legend-item"><div class="legend-dot U"></div>Uncontrolled</div><div class="legend-item"><div class="legend-dot M"></div>Missed</div></div>
+  <div class="dot-map" id="dot-map">${renderDots()}</div>
+  <button class="add-dot-btn" onclick="addDot()">+ Add a dot</button>
+</div>
+<div class="q-block">
+  <div class="q-num">01.4</div>
+  <div class="q-text">What is the biggest mistake or gap so far? Name both in one answer.</div>
+  <textarea class="q-input" placeholder="Mistake: what went wrong&#10;Gap: what was needed but never happened" oninput="saveAnswer('mistake_gap',this.value)">${esc(answers.mistake_gap)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">01.5</div>
+  <div class="q-text">What external factors — outside your control — have affected this? (Facts only, not excuses.)</div>
+  <textarea class="q-input q-single" placeholder="List them cleanly." oninput="saveAnswer('external_factors',this.value)">${esc(answers.external_factors)}</textarea>
+</div>
+${aiPlaceholder()}
+<div class="nav-row"><button class="btn-back" onclick="goHome()">Exit</button><button class="btn-next" onclick="nextRoom()">Enter the Bridge →</button><div class="nav-hint">Room 1 of ${roomCount()}</div></div>`;}
+
+function buildFearsRoom(){return `
+<div class="room-header">
+  <div><div class="room-level">Level 01 — Kickoff</div><h2 class="room-title serif">Name the fears<br>before they name you.</h2></div>
+  ${roomInfoBtn()}
+</div>
+<div class="room-info-panel">${ROOM_INFO.fears}</div>
+<div class="sprint-banner"><div class="sprint-icon">⏱</div><div class="sprint-text"><strong>5–10 min sprint.</strong> Click the timer. Write fast. No filtering.</div></div>
+<div class="q-block">
+  <div class="q-num">01.1</div><div class="q-text">In one sentence — what is this project?</div>
+  <textarea class="q-input q-single" placeholder="Name it plainly." oninput="saveAnswer('project_one_line',this.value)">${esc(answers.project_one_line)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">01.2</div><div class="q-text">What does success look like in 90 days? In 6 months?</div>
+  <textarea class="q-input" placeholder="Specific. Numbers. Milestones. Feelings." oninput="saveAnswer('success_vision',this.value)">${esc(answers.success_vision)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">01.3</div><div class="q-text">List your fears and assumptions. For each — is it a fact or a prediction? <span class="q-ref">Barrett: your brain predicts, it doesn't read reality</span></div>
+  <textarea class="q-input" placeholder="Fear 1: ___ → Fact / Prediction&#10;Fear 2: ___ → Fact / Prediction" oninput="saveAnswer('fears_audit',this.value)" style="min-height:90px">${esc(answers.fears_audit)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">01.4</div><div class="q-text">What do you already have that gives you the right to do this?</div>
+  <textarea class="q-input" placeholder="Evidence, skills, relationships, past wins..." oninput="saveAnswer('existing_assets',this.value)">${esc(answers.existing_assets)}</textarea>
+</div>
+${aiPlaceholder()}
+<div class="nav-row"><button class="btn-back" onclick="goHome()">Exit</button><button class="btn-next" onclick="nextRoom()">Build the Bridge →</button><div class="nav-hint">Room 1 of ${roomCount()}</div></div>`;}
+
+function buildBridgeRoom(){const isTL=currentMode==='timeline';return `
+<div class="room-header">
+  <div><div class="room-level">Level 0${currentRoom+1} — The Bridge</div><h2 class="room-title serif">Best path forward<br>from exactly here.</h2></div>
+  ${roomInfoBtn()}
+</div>
+<div class="room-info-panel">${ROOM_INFO.bridge}</div>
+<div class="sprint-banner gold"><div class="sprint-icon">⏱</div><div class="sprint-text"><strong>5–10 min sprint.</strong> Every step. Concrete. Dated. No step too small.</div></div>
+${!isTL?`<div class="q-block">
+  <div class="q-num">02.1</div><div class="q-text">Where are you compared to the original plan? What's drifted, what's held, what needs a full rethink?</div>
+  <textarea class="q-input" placeholder="Be honest about the gap between plan and reality..." oninput="saveAnswer('plan_vs_reality',this.value)">${esc(answers.plan_vs_reality)}</textarea>
+</div>`:''}
+<div class="q-block">
+  <div class="q-num">02.2</div><div class="q-text">Given reality — what is the actual goal now? Has it shifted?</div>
+  <textarea class="q-input q-single" placeholder="The real goal, not the original one." oninput="saveAnswer('actual_goal',this.value)">${esc(answers.actual_goal)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">02.3</div><div class="q-text">Every next step. Who / What / By When. No step too small. This becomes your new plan.</div>
+  <textarea class="q-input" placeholder="Step 1: _____ — [Owner] — [By when]&#10;Step 2: _____ — [Owner] — [By when]" oninput="saveAnswer('next_steps',this.value)" style="min-height:110px">${esc(answers.next_steps)}</textarea>
+</div>
+<div class="munger-box">
+  <div class="munger-title">⚡ Munger Check — Poor Charlie's Almanack</div>
+  <div class="munger-q">What feedback loop is compounding in the wrong direction right now?</div>
+  <textarea class="munger-input" placeholder="Name the loop..." oninput="saveAnswer('munger_loop',this.value)">${esc(answers.munger_loop)}</textarea>
+  <div class="munger-q">What is the tipping point you need to reach for momentum to shift?</div>
+  <textarea class="munger-input" placeholder="The moment things tip..." oninput="saveAnswer('munger_tip',this.value)">${esc(answers.munger_tip)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">02.4</div><div class="q-text">What can you do today — with exactly what you have right now?</div>
+  <textarea class="q-input q-single" placeholder="First move. No conditions." oninput="saveAnswer('today_move',this.value)">${esc(answers.today_move)}</textarea>
+</div>
+${isTL?`<div class="q-block" style="background:var(--accent3);border-radius:10px;padding:1rem">
+  <div class="q-num" style="color:var(--accent)">TIMELINE AUDIT</div>
+  <div class="q-text">Honest timeline for this type of work — what does your evidence say?</div>
+  <textarea class="q-input" placeholder="Ideal: X days&#10;Realistic: X days&#10;What I usually tell clients: X&#10;What the evidence says: X" oninput="saveAnswer('timeline_audit',this.value)" style="min-height:90px;margin-top:.5rem">${esc(answers.timeline_audit)}</textarea>
+</div>`:''}
+${aiPlaceholder()}
+<div class="nav-row"><button class="btn-back" onclick="prevRoom()">← Back</button><button class="btn-next" onclick="nextRoom()">${currentMode==='timeline'?'See Results →':'Enter the Mirror →'}</button><div class="nav-hint">Room ${currentRoom+1} of ${roomCount()}</div></div>`;}
+
+function buildMirrorRoom(){return `
+<div class="room-header">
+  <div><div class="room-level">Level 0${currentRoom+1} — The Mirror</div><h2 class="room-title serif">What did this<br>reveal about you?</h2></div>
+  ${roomInfoBtn()}
+</div>
+<div class="room-info-panel">${ROOM_INFO.mirror}</div>
+<div class="sprint-banner"><div class="sprint-icon">⏱</div><div class="sprint-text"><strong>5–10 min sprint.</strong> This builds your Operating Manual — the document that makes you faster every time.</div></div>
+<div class="q-block">
+  <div class="q-num">03.1</div><div class="q-text">What state were you in when things stalled — and what triggered it?</div>
+  <textarea class="q-input q-single" placeholder="Name the state. Name the trigger." oninput="saveAnswer('stall_state',this.value)">${esc(answers.stall_state)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">03.2</div><div class="q-text">What behaviour or habit showed up that slowed you down? What condition do you need to work well?</div>
+  <textarea class="q-input" placeholder="Behaviour: e.g. over-preparation, avoidance...&#10;Condition needed: e.g. rested, clear deadline, accountability..." oninput="saveAnswer('habit_condition',this.value)">${esc(answers.habit_condition)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">03.3</div><div class="q-text">What type of work was this?</div>
+  <div class="wt-grid">${WORK_TYPES.map(wt=>`<button class="wt-btn${selectedWorkTypes.includes(wt.id)?' sel':''}" onclick="toggleWT('${wt.id}',this)"><div class="wt-dot" style="background:${wt.color}"></div>${wt.label}</button>`).join('')}</div>
+</div>
+<div class="q-block">
+  <div class="q-num">03.4</div><div class="q-text">What is your real timeline for this type of work? Not ideal — what does the evidence say?</div>
+  <textarea class="q-input q-single" placeholder="e.g. Deep strategy work actually takes me 3 days, not 1..." oninput="saveAnswer('real_timeline',this.value)">${esc(answers.real_timeline)}</textarea>
+</div>
+<div class="q-block">
+  <div class="q-num">03.5</div><div class="q-text">Write your rules. What did this session confirm or reveal about you? <span class="q-ref">Da Vinci: one observation is a note. Three is a law.</span></div>
+  <div class="rule-list" id="rule-list">${renderRules()}</div>
+  <button class="add-rule-btn" onclick="addRule()">+ Add a rule</button>
+</div>
+${aiPlaceholder()}
+<div class="nav-row"><button class="btn-back" onclick="prevRoom()">← Back</button><button class="btn-next" id="finish-btn" onclick="finishGame()">Reveal the Pattern 🏆</button><div class="nav-hint">Final room</div></div>`;}
+
+/* ============================================================
+   DOTS, RULES, INPUTS
+   ============================================================ */
+function esc(v){return (v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escAttr(v){return (v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+function renderDots(){return dots.map((d,i)=>`
+<div class="dot-row" id="dot-row-${i}">
+  <div class="dot-circle ${d.label}" id="dc-${i}"></div>
+  <div class="dot-content">
+    <input type="text" class="dot-event" placeholder="What happened?" value="${escAttr(d.event)}" oninput="dots[${i}].event=this.value">
+    <input type="text" class="dot-event q-single" placeholder="Date or timeframe" value="${escAttr(d.date)}" oninput="dots[${i}].date=this.value" style="min-height:34px">
+    <div class="dot-label">${['R','W','U','M'].map(l=>`<button class="label-btn ${l}${d.label===l?' sel':''}" onclick="setDotLabel(${i},'${l}',this)">${l==='R'?'Right':l==='W'?'Wrong':l==='U'?'Uncontrolled':'Missed'}</button>`).join('')}</div>
+  </div>
+  <button class="dot-del" onclick="deleteDot(${i})">✕</button>
+</div>`).join('');}
+
+function renderRules(){return rules.map((r,i)=>`
+<div class="rule-item"><div class="rule-num">0${i+1}</div>
+<textarea class="rule-text" placeholder='"I do not do deep work well after 3pm"' oninput="rules[${i}]=this.value">${esc(r)}</textarea></div>`).join('');}
+
+function setDotLabel(i,l,btn){dots[i].label=l;document.getElementById('dc-'+i).className='dot-circle '+l;document.getElementById('dot-row-'+i).querySelectorAll('.label-btn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
+function addDot(){dots.push({event:'',label:'',date:''});const dm=document.getElementById('dot-map');if(dm)dm.innerHTML=renderDots();}
+function deleteDot(i){if(dots.length<=1)return;dots.splice(i,1);const dm=document.getElementById('dot-map');if(dm)dm.innerHTML=renderDots();}
+function addRule(){rules.push('');const rl=document.getElementById('rule-list');if(rl)rl.innerHTML=renderRules();}
+function toggleWT(id,btn){if(selectedWorkTypes.includes(id)){selectedWorkTypes=selectedWorkTypes.filter(w=>w!==id);btn.classList.remove('sel');}else{selectedWorkTypes.push(id);btn.classList.add('sel');}saveAnswer('work_types',selectedWorkTypes.join(', '));}
+function saveAnswer(k,v){answers[k]=v;}
+
+/* ============================================================
+   FINISH + AUTOSAVE
+   ============================================================ */
+async function finishGame(){
+  const btn=document.getElementById('finish-btn');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  const session={
+    mode:currentMode,
+    modeLabel:MODES[currentMode].label,
+    env:selectedEnv,
+    project:answers.project_one_line||answers.success_vision||'',
+    prediction:document.getElementById('pred-input')?.value||'',
+    answers:{...answers},
+    dots:dots.filter(d=>(d.event||'').trim()),
+    rules:rules.filter(r=>(r||'').trim()),
+    workTypes:[...selectedWorkTypes],
+    realTimeline:answers.real_timeline||'',
+    date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})
+  };
+  currentSession=session;
+  buildBossScreen(session);
+  showScreen('boss');
+  const badge=document.getElementById('save-badge');
+  badge.className='saved-badge';badge.textContent='Saving...';
+  const res=await saveSession(session);
+  if(res.ok){badge.textContent='✓ Session saved to your Manual';}
+  else{badge.className='saved-badge fail';badge.textContent='⚠ Save failed — download your PDF now to keep this session';}
+  updateHomeTeaser();
+  if(btn){btn.disabled=false;btn.textContent='Reveal the Pattern 🏆';}
+}
+
+function buildBossScreen(s){
+  const a=s.answers;
+  document.getElementById('boss-summary').innerHTML=`
+    <div class="sum-card"><div class="sum-card-label">The Project</div><div class="sum-card-val">${esc(a.project_one_line||a.success_vision)||'—'}</div></div>
+    <div class="sum-card"><div class="sum-card-label">The Goal (Now)</div><div class="sum-card-val">${esc(a.actual_goal||a.project_one_line)||'—'}</div></div>
+    <div class="sum-card"><div class="sum-card-label">First Move Today</div><div class="sum-card-val">${esc(a.today_move)||'—'}</div></div>
+    <div class="sum-card"><div class="sum-card-label">Real Timeline</div><div class="sum-card-val">${esc(a.real_timeline)||'—'}</div></div>
+    <div class="sum-card"><div class="sum-card-label">Work Type</div><div class="sum-card-val">${esc(a.work_types)||'—'}</div></div>
+    <div class="sum-card"><div class="sum-card-label">The Block</div><div class="sum-card-val">${esc(a.habit_condition||a.stall_state)||'—'}</div></div>`;
+
+  const wins=[];
+  s.dots.filter(d=>d.label==='R').forEach(d=>wins.push(d.event));
+  (s.rules||[]).forEach(r=>wins.push(r));
+  if(a.existing_assets) wins.push(a.existing_assets);
+  if(a.today_move) wins.push('Committed first move: '+a.today_move);
+  document.getElementById('boss-impact').innerHTML=`<div class="impact-label">Impact List — What You Have Done</div>${
+    wins.length ? wins.slice(0,8).map(w=>`<div class="impact-item"><div class="impact-dot"></div>${esc(w)}</div>`).join('')
+    : '<div style="font-size:.8rem;color:rgba(255,255,255,.35);font-style:italic">Label some dots as Right moves, or write rules, and your wins appear here.</div>'}`;
+  document.getElementById('boss-prediction').innerHTML=s.prediction?`"${esc(s.prediction)}"`:'No prediction written.';
+}
+
+/* ============================================================
+   PDF EXPORT — opens a formatted document, triggers print dialog
+   ============================================================ */
+function exportPDF(){
+  if(!currentSession){alert('No session data found.');return;}
+  const s=currentSession,a=s.answers;
+  const labelName={R:'Right move',W:'Wrong move',U:'Uncontrolled',M:'Missed'};
+  const labelColor={R:'#1a5c3a',W:'#8B1A1A',U:'#c9902a',M:'#1a3a6e'};
+
+  const wins=[];
+  s.dots.filter(d=>d.label==='R').forEach(d=>wins.push(d.event));
+  (s.rules||[]).forEach(r=>wins.push(r));
+  if(a.existing_assets) wins.push(a.existing_assets);
+
+  const block=(label,val)=> val ? `<div class="field"><div class="field-label">${label}</div><div class="field-val">${esc(val).replace(/\n/g,'<br>')}</div></div>` : '';
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Connecting Dots — ${esc(s.project)||'Session Report'}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:18mm 16mm}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Instrument Sans',sans-serif;color:#1A1A1A;line-height:1.65;font-size:10.5pt;background:#fff}
+.serif{font-family:'DM Serif Display',serif}
+.cover{padding:40mm 0 20mm;border-bottom:2px solid #8B1A1A;margin-bottom:12mm;page-break-after:always}
+.brand{font-size:9pt;letter-spacing:.28em;text-transform:uppercase;color:#c9902a;font-weight:600;margin-bottom:14mm}
+.cover h1{font-size:36pt;line-height:1.02;margin-bottom:6mm}
+.cover h1 em{color:#8B1A1A;font-style:italic}
+.cover-project{font-size:13pt;color:#3a3a3a;font-style:italic;margin-bottom:10mm;max-width:130mm}
+.cover-meta{font-family:'DM Mono',monospace;font-size:9pt;color:#7a7a7a;letter-spacing:.04em}
+.cover-meta span{display:inline-block;margin-right:8mm}
+h2{font-family:'DM Serif Display',serif;font-size:16pt;color:#8B1A1A;margin:10mm 0 4mm;padding-bottom:2mm;border-bottom:1px solid #e8e4da}
+h2:first-of-type{margin-top:0}
+.section{page-break-inside:avoid;margin-bottom:6mm}
+.field{margin-bottom:4.5mm}
+.field-label{font-size:8pt;letter-spacing:.14em;text-transform:uppercase;color:#7a7a7a;font-weight:600;margin-bottom:1.5mm}
+.field-val{font-size:10.5pt;color:#1A1A1A}
+.dot-item{display:flex;gap:4mm;padding:2.5mm 0;border-bottom:1px solid #f2efe8;page-break-inside:avoid}
+.dot-marker{width:9pt;height:9pt;border-radius:50%;flex-shrink:0;margin-top:1.4mm}
+.dot-body{flex:1}
+.dot-text{font-size:10.5pt}
+.dot-meta{font-family:'DM Mono',monospace;font-size:8pt;color:#7a7a7a;margin-top:.8mm}
+ol,ul{padding-left:6mm;margin:2mm 0}
+li{margin-bottom:2mm;page-break-inside:avoid}
+.rule-line{background:#faf8f4;border-left:3px solid #c9902a;padding:2.5mm 4mm;margin-bottom:2.5mm;font-size:10.5pt;page-break-inside:avoid}
+.impact-line{padding:2mm 0 2mm 5mm;position:relative;font-size:10.5pt;page-break-inside:avoid}
+.impact-line:before{content:'';position:absolute;left:0;top:4.2mm;width:5pt;height:5pt;border-radius:50%;background:#c9902a}
+.pred{background:#faf8f4;border:1px solid #e8e4da;padding:4mm 5mm;font-style:italic;color:#3a3a3a;margin-top:4mm}
+.footer{margin-top:14mm;padding-top:4mm;border-top:1px solid #e8e4da;font-size:8.5pt;color:#b0b0b0;letter-spacing:.06em;text-align:center}
+.print-bar{position:fixed;top:0;left:0;right:0;background:#0e0e0e;color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;font-size:13px;z-index:999}
+.print-bar button{background:#c9902a;color:#0e0e0e;border:none;border-radius:6px;padding:8px 18px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit}
+body{padding-top:56px}
+@media print{.print-bar{display:none}body{padding-top:0}}
+</style></head><body>
+<div class="print-bar">
+  <span>Choose <strong>Save as PDF</strong> as the destination, then Save.</span>
+  <button onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="cover">
+  <div class="brand">EXCELLE · Connecting Dots</div>
+  <h1 class="serif">Session Plan<br>&amp; <em>Pattern Report</em></h1>
+  <div class="cover-project">${esc(s.project)||'Untitled session'}</div>
+  <div class="cover-meta"><span>${esc(s.date)}</span><span>${esc(s.modeLabel)}</span><span>${esc(s.env)||'—'}</span></div>
+</div>
+
+<h2>1 · The Updated Plan</h2>
+<div class="section">
+  ${block('The actual goal now', a.actual_goal||a.project_one_line)}
+  ${block('Next steps — who / what / by when', a.next_steps)}
+  ${block('First move today', a.today_move)}
+  ${block('Feedback loop to break', a.munger_loop)}
+  ${block('Tipping point to reach', a.munger_tip)}
+  ${block('Timeline audit', a.timeline_audit)}
+</div>
+
+<h2>2 · Plan vs Reality</h2>
+<div class="section">
+  ${block('The approved plan', a.original_vision)}
+  ${block('Where things actually stand', a.plan_vs_reality)}
+  ${block('Biggest mistake and gap', a.mistake_gap)}
+  ${block('External factors', a.external_factors)}
+  ${block('Fears and assumptions', a.fears_audit)}
+</div>
+
+${s.dots.length?`<h2>3 · The Dot Map</h2>
+<div class="section">
+${s.dots.map(d=>`<div class="dot-item"><div class="dot-marker" style="background:${labelColor[d.label]||'#b0b0b0'}"></div><div class="dot-body"><div class="dot-text">${esc(d.event)}</div><div class="dot-meta">${d.date?esc(d.date)+' · ':''}${labelName[d.label]||'Unlabelled'}</div></div></div>`).join('')}
+</div>`:''}
+
+<h2>${s.dots.length?4:3} · Self Intelligence</h2>
+<div class="section">
+  ${block('Work type', a.work_types)}
+  ${block('Real timeline for this work', a.real_timeline)}
+  ${block('Stall state and trigger', a.stall_state)}
+  ${block('Behaviour and condition needed', a.habit_condition)}
+</div>
+
+${(s.rules||[]).length?`<h2>${s.dots.length?5:4} · Rules Discovered</h2>
+<div class="section">${s.rules.map((r,i)=>`<div class="rule-line"><strong>Rule ${i+1}.</strong> ${esc(r)}</div>`).join('')}</div>`:''}
+
+${wins.length?`<h2>${s.dots.length?6:5} · Impact List — What You Have Done</h2>
+<div class="section">${wins.map(w=>`<div class="impact-line">${esc(w)}</div>`).join('')}</div>`:''}
+
+${s.prediction?`<div class="pred"><strong>Emotional prediction at the start:</strong><br>"${esc(s.prediction)}"</div>`:''}
+
+<div class="footer">Generated by Connecting Dots — an EXCELLE tool · ${esc(s.date)}</div>
+</body></html>`;
+
+  const w=window.open('','_blank');
+  if(!w){alert('Please allow pop-ups for this site so the document can open.');return;}
+  w.document.write(html);
+  w.document.close();
+}
+
+/* ============================================================
+   NAVIGATION + TIMER
+   ============================================================ */
+function nextRoom(){
+  if(currentRoom<MODES[currentMode].rooms.length-1){currentRoom++;renderRoom();}
+  else finishGame();
+}
+function prevRoom(){if(currentRoom>0){currentRoom--;renderRoom();}else showScreen('activation');}
+function resetTimer(){
+  timerSeconds=600;timerRunning=false;clearInterval(timerInterval);
+  updateTimerDisplay();document.getElementById('timer-box').className='timer-box';
+}
+function toggleTimer(){
+  if(timerRunning){clearInterval(timerInterval);timerRunning=false;document.getElementById('timer-box').className='timer-box';}
+  else{
+    timerRunning=true;document.getElementById('timer-box').className='timer-box running';
+    timerInterval=setInterval(()=>{
+      timerSeconds--;
+      if(timerSeconds<=0){timerSeconds=0;clearInterval(timerInterval);timerRunning=false;document.getElementById('timer-box').className='timer-box';}
+      else if(timerSeconds<=60)document.getElementById('timer-box').className='timer-box urgent';
+      updateTimerDisplay();
+    },1000);
+  }
+}
+function updateTimerDisplay(){
+  const m=Math.floor(timerSeconds/60),s=timerSeconds%60;
+  const el=document.getElementById('timer-box');
+  if(el)el.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+}
+
+/* ============================================================
+   PERSONAL OPERATING MANUAL
+   ============================================================ */
+async function renderManual(){
+  const body=document.getElementById('manual-body');
+  body.innerHTML='<div class="empty-state">Loading your manual...</div>';
+  const {rows,error}=await loadSessions();
+  if(error){
+    body.innerHTML=`<div class="err-note"><strong>Can't reach your Manual right now.</strong><br>This usually means the database is waking up. Wait a moment and refresh the page.</div>`;
+    return;
+  }
+  if(!rows.length){
+    body.innerHTML=`<div class="empty-state">Your Operating Manual is empty.<br>Complete your first session and your rules,<br>patterns, and timelines will appear here.</div>`;
+    return;
+  }
+  const fmt=d=>new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const allRules=rows.flatMap(s=>(s.rules||[]).map(r=>({rule:r,date:fmt(s.created_at)})));
+  const wtCounts={};rows.forEach(s=>(s.work_types||[]).forEach(wt=>{wtCounts[wt]=(wtCounts[wt]||0)+1;}));
+  const maxWt=Math.max(1,...Object.values(wtCounts));
+
+  let html=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px">
+    <div style="background:var(--ink);border-radius:10px;padding:.9rem;text-align:center"><div style="font-size:1.7rem;font-family:'DM Mono',monospace;color:var(--gold)">${rows.length}</div><div style="font-size:.65rem;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.1em;margin-top:.18rem">Sessions</div></div>
+    <div style="background:var(--ink);border-radius:10px;padding:.9rem;text-align:center"><div style="font-size:1.7rem;font-family:'DM Mono',monospace;color:var(--gold)">${allRules.length}</div><div style="font-size:.65rem;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.1em;margin-top:.18rem">Rules</div></div>
+    <div style="background:var(--ink);border-radius:10px;padding:.9rem;text-align:center"><div style="font-size:1.7rem;font-family:'DM Mono',monospace;color:var(--gold)">${Object.keys(wtCounts).length}</div><div style="font-size:.65rem;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.1em;margin-top:.18rem">Work Types</div></div>
+  </div>`;
+
+  if(allRules.length){
+    html+=`<div><div class="manual-section-title">All Rules</div>${allRules.map((r,i)=>`<div class="all-rule-row"><div class="ar-num">${String(i+1).padStart(2,'0')}</div><div class="ar-text">${esc(r.rule)}</div><div class="ar-date">${r.date}</div></div>`).join('')}</div>`;
+  }
+  const tl=rows.filter(s=>s.real_timeline);
+  if(tl.length){
+    html+=`<div><div class="manual-section-title">Timeline Evidence</div>${tl.map(s=>`<div class="all-rule-row"><div class="ar-num" style="color:var(--gold)">⏱</div><div class="ar-text">${esc(s.real_timeline)}</div><div class="ar-date">${fmt(s.created_at)}</div></div>`).join('')}</div>`;
+  }
+  if(Object.keys(wtCounts).length){
+    html+=`<div><div class="manual-section-title">Work Type Distribution</div><div class="wt-tally">${WORK_TYPES.filter(wt=>wtCounts[wt.id]).map(wt=>`<div class="wt-card"><div class="wt-name">${wt.label}</div><div class="wt-count">${wtCounts[wt.id]}</div><div class="wt-bar"><div class="wt-fill" style="width:${Math.round((wtCounts[wt.id]/maxWt)*100)}%;background:${wt.color}"></div></div></div>`).join('')}</div></div>`;
+  }
+  html+=`<div><div class="manual-section-title">All Sessions</div>${rows.map(s=>`<div class="session-card"><div class="sc-header"><div><div class="sc-date">${fmt(s.created_at)} · ${esc(s.env)||'—'}</div><div class="sc-project">${esc(s.project)||'Untitled session'}</div></div><div style="display:flex;align-items:center;gap:.45rem"><div class="sc-mode">${MODES[s.mode]?MODES[s.mode].label:esc(s.mode)}</div><button class="sc-del" onclick="deleteSession('${s.id}')">Delete</button></div></div>${(s.rules||[]).length?`<div class="sc-rules">${s.rules.map(r=>`<div class="sc-rule">${esc(r)}</div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
+  html+=`<div style="text-align:center;padding:.75rem 0"><button onclick="clearAllSessions()" style="background:none;border:1px solid var(--paper3);border-radius:8px;padding:.5rem 1.1rem;font-size:.76rem;color:var(--ink4);cursor:pointer;font-family:inherit">Clear all sessions</button></div>`;
+  body.innerHTML=html;
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+  if(id==='manual')renderManual();
+}
+function goHome(){clearInterval(timerInterval);timerRunning=false;showScreen('home');updateHomeTeaser();}
+
+updateHomeTeaser();
+</script>
+</body>
+</html>
